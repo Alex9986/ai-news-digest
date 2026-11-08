@@ -132,13 +132,58 @@ node digest.mjs
 | 推送时间 | 改 cron；北京 10:00 = UTC 02:00 |
 | 增加/删除新闻源 | `digest.mjs` 顶部的 `FEEDS` 数组，加 `{ name, url }` 即可 |
 | 同一来源最多几条 | `MAX_PER_SOURCE = 3`（保证来源多样，不够 5 条时会自动放宽） |
+| 用 DeepSeek 筛选并写中文摘要 | 配 `DEEPSEEK_API_KEY`，见下一节；临时关掉加 `--no-llm` |
 | 收件人 | `GMAIL_TO`，逗号分隔 |
 | 邮件样式 | `buildContent()` 里的 `html` 模板 |
 | 加中文摘要 | 在 `buildContent` 之前接一次模型 API，把 `items` 的标题和摘要丢进去生成 5 句中文；其余不用动 |
 
 时间窗口：先取 24 小时内的新闻，不够 5 条时扩展到 72 小时，保证每天都有一封。
 
-## 5. 常见问题
+## 5. 可选：让 DeepSeek 帮你筛选
+
+不接模型时，脚本按「发布时间最新」挑 5 条，会出现评测、软文、同一事件两条的情况。配一个 DeepSeek API key 后，流程变成：
+
+```
+抓取全部候选（最多 30 条）
+        ↓
+DeepSeek：按重要性挑 5 条、合并同一事件、排除软文和评测
+        ↓
+写中文标题 + 一句话摘要
+```
+
+邮件里每条会变成「中文标题 / 原文标题 / 来源 · 时间 / 中文摘要 / 链接」。
+
+### 配置
+
+1. 去 <https://platform.deepseek.com/api_keys> 创建 API key（需要先充值，按量计费）。
+2. 本地写进 `.env`：
+
+```ini
+DEEPSEEK_API_KEY=sk-...
+```
+
+GitHub Actions 里加一个同名 secret：`DEEPSEEK_API_KEY`。
+
+3. 跑 `npm run preview` 看效果。日志里会出现：
+
+```
+[llm] tokens: 输入 3120 / 输出 280
+[llm] DeepSeek 选出 5 条（候选 30 条）
+```
+
+### 行为和成本
+
+- 模型**只从候选里挑**，提示词明确要求「只从候选里选，不要编造新闻」，所以不会凭空多出一条。
+- **任何失败都会回退**：没配 key、超时、401、余额不足、返回不是合法 JSON，都会自动退回按时间挑选，日报不会因为模型挂掉而断掉。
+- 每次大约 2–4k 输入 token、几百输出 token，按 DeepSeek 当前定价是千分之一美元的量级（以官网为准），一个月通常不到一块钱。
+- 临时关掉：`node digest.mjs --no-llm`，或从 GitHub 删掉这个 secret。
+- 换模型：`DEEPSEEK_MODEL=deepseek-reasoner` 会更慢更贵，日报场景没必要。
+
+### 提示词在哪
+
+`digest.mjs` 顶部的 `LLM_PROMPT`。想改口味（比如只关注模型发布、少一点融资新闻），直接改那段中文，不用动代码。
+
+## 6. 常见问题
 
 **没收到邮件？**
 先看 Gmail 的「已发送」里有没有这封邮件。有，说明发出去了，去垃圾邮件里找，或把发件人加进联系人。没有，看 Actions 日志里的 `[fail]` / `[error]`。
@@ -149,14 +194,18 @@ node digest.mjs
 **某个源一直 429 / 403**
 源在限流或屏蔽。脚本会跳过它，用剩下的源照样凑够 5 条。不想要就把它从 `FEEDS` 里删掉。
 
+**日志里出现 `[llm] 调用失败，回退到按时间挑选`**
+邮件照样会发，只是没用模型筛选。常见原因：key 写错或已撤销（401）、账户余额不足（402）、超时。看这一行后面的错误信息，修好即可，脚本本身不用改。
+
 **邮件里出现了重复新闻**
 `seen.json` 没有被持久化。GitHub Actions 里要保证最后一步提交成功（需要 `contents: write` 权限）；不要在本地跑完 `npm start` 又把 `seen.json` 重置了。
 
 **想改成 Telegram 而不是邮件**
 把 `sendMail()` 换成一次 `fetch` 到 `https://api.telegram.org/bot<token>/sendMessage` 即可，其余逻辑不用动。
 
-## 6. 安全
+## 7. 安全
 
 - 应用专用密码等同于账号的发信权限，只放在 `.env` 或 GitHub Secrets 里，**永远不要提交**。
-- 怀疑泄露就去 <https://myaccount.google.com/apppasswords> 撤销那一条，重新生成。
+- DeepSeek API key 也一样：只放 `.env` / Secrets。它的权限是「消耗你的余额」，泄露了去控制台删掉重建。
+- 怀疑 Gmail 密码泄露就去 <https://myaccount.google.com/apppasswords> 撤销那一条，重新生成。
 - 仓库是 public 也没关系，只要 `.env` 没进去；但仍建议用私有仓库，日志里会包含你的邮件地址。
