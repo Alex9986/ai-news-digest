@@ -2,8 +2,11 @@ name: AI 日报
 
 on:
   schedule:
-    # 02:00 UTC = 北京时间 10:00。GitHub 的 cron 固定用 UTC，不跟随夏令时。
-    - cron: '0 2 * * *'
+    # 目标：北京时间 10:00 左右收到。
+    # GitHub 自 2026-08 起把 schedule 延迟约 6.7–8.3 小时才创建 run（社区 issue #209507/#210361/#212830），
+    # 所以这里故意提前：19:00 UTC = 北京 03:00，延迟 ~7.5 小时后约在北京 10:30 触发。
+    # GitHub 修好这个 bug 之后，改回 '0 2 * * *'。
+    - cron: '0 19 * * *'
   workflow_dispatch: {} # 支持在 Actions 页面手动点一次，用来测试
 
 permissions:

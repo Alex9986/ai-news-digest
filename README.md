@@ -74,11 +74,13 @@ npm start
    - `GMAIL_APP_PASSWORD`（16 位，带空格也行）
    - `GMAIL_TO`
 3. 打开 **Actions** 标签页，左侧选「AI 日报」，点 **Run workflow** 手动跑一次，确认收到邮件。
-4. 之后每天 UTC 02:00（北京时间 10:00）自动执行。
+4. 之后每天自动执行（当前 cron 见下面的“延迟补偿”说明）。
 
 几点实话：
 
-- **cron 不保证准点**，GitHub 的定时任务在高峰期可能延迟 5–20 分钟。要精确到 10:00 整，用 VPS。
+- **cron 不保证准点**。而且从 2026 年 8 月底起，GitHub 的 `schedule` 出现了普遍性延迟：run 会在预定时间之后 6–8 小时才被创建（社区 issue [#209507](https://github.com/orgs/community/discussions/209507)、[#210361](https://github.com/orgs/community/discussions/210361)、[#212830](https://github.com/orgs/community/discussions/212830)）。
+- 所以本仓库的 cron 现在是 **`0 19 * * *`**（19:00 UTC = 北京 03:00），靠提前 8 小时来抵消延迟，实际到达大约在北京 09:40–11:20，多数日子在 10:30 前后。
+- **GitHub 修好这个 bug 之后，把 cron 改回 `0 2 * * *`**，否则会变成凌晨 3 点发信。
 - **仓库 60 天无提交，定时任务会被暂停**。这个项目每天会提交一次 `seen.json`，正好避免了这个问题；如果你手动关掉了提交步骤，记得偶尔点一下。
 - 定时任务跑在默认分支上；如果你在别的分支上改代码，要合并过去才会生效。
 - 免费额度：公开仓库不限，私有仓库每月 2000 分钟，这个任务每天约 1 分钟。
@@ -129,7 +131,7 @@ node digest.mjs
 | 需求 | 改哪里 |
 |---|---|
 | 每天几条 | `digest.mjs` 里的 `MAX_ITEMS = 5` |
-| 推送时间 | 改 cron；北京 10:00 = UTC 02:00 |
+| 推送时间 | 改 cron；北京 10:00 = UTC 02:00。当前为了抵消 GitHub 延迟用的是 `0 19 * * *`，详见方案 A 的说明 |
 | 增加/删除新闻源 | `digest.mjs` 顶部的 `FEEDS` 数组，加 `{ name, url }` 即可 |
 | 同一来源最多几条 | `MAX_PER_SOURCE = 3`（保证来源多样，不够 5 条时会自动放宽） |
 | 用 DeepSeek 筛选并写中文摘要 | 配 `DEEPSEEK_API_KEY`，见下一节；临时关掉加 `--no-llm` |

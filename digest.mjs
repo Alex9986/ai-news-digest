@@ -361,7 +361,7 @@ function buildContent(items, { curated = false } = {}) {
       <td style="padding:28px 28px 8px">
         <div style="font-size:11px;letter-spacing:.18em;color:#a0a0a0;text-transform:uppercase">AI 日报</div>
         <h1 style="margin:8px 0 4px;font-size:22px;font-weight:700;color:#111">${escapeHtml(today)}</h1>
-        <p style="margin:0;font-size:13px;color:#9b9b9b">北京时间 10:00 自动发送 · ${items.length} 条</p>
+        <p style="margin:0;font-size:13px;color:#9b9b9b">北京时间 10:00 左右自动发送 · ${items.length} 条</p>
       </td>
     </tr>
     <tr>
